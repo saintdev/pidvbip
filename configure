@@ -30,6 +30,7 @@ Options:
     --host=HOST                 build to run on HOST
     --cross-prefix=PREFIX       prepend PREFIX to compilation tools
     --vc-sdk-path=VC_SDK_PATH   path to VideoCore SDK [/opt/vc]
+    --disable-avahi             disable avahi support
     --disable-libcec            disable libcec support
     --enable-debug              enable debugging symbols
     --enable-raspberrypi        enable building for Raspberry Pi
@@ -56,6 +57,9 @@ for opt do
             ;;
         --enable-debug)
             debug="yes"
+            ;;
+        --disable-avahi)
+            avahi="no"
             ;;
         --disable-libcec)
             libcec="no"
@@ -185,8 +189,6 @@ if [ "$avahi" = "auto" ] ; then
         LDFLAGS="$AVAHI_LIBS $LDFLAGS"
         CFLAGS="$AVAHI_CFLAGS $CFLAGS"
         define HAVE_AVAHI
-    else
-        die "Failed to locate Avahi"
     fi
 fi
 

@@ -487,7 +487,11 @@ int main(int argc, char* argv[])
 
     if (argc == 1) {
       /* No arguments, try avahi discovery */
+#ifdef HAVE_AVAHI
       avahi_discover_tvh(&htsp);
+#else
+      fprintf(stderr, "WARNING: Not compiled with Avahi support.\n");
+#endif
 
       if (htsp.host == NULL) {
         /* No avahi, try to read default config from /boot/config.txt */
