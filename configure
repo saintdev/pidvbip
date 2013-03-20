@@ -134,19 +134,29 @@ if [ "$raspberrypi" = "yes" ] ; then
 fi
 
 if ${cross_prefix}pkg-config --exists freetype2 2>/dev/null ; then
-    LDFLAGS="$(${cross_prefix}pkg-config --libs freetype2) $LDFLAGS"
-    CFLAGS="$(${cross_prefix}pkg-config --cflags freetype2) $CFLAGS"
-    if ! echo $LDFLAGS | grep -qe '\-lbz2' ; then
-        LDFLAGS="-lbz2 $LDFLAGS"
+    FT2_LIBS="$(${cross_prefix}pkg-config --libs freetype2)"
+    FT2_CFLAGS="$(${cross_prefix}pkg-config --cflags freetype2)"
+fi
+[ -z "$FT2_LIBS" ] && FT2_LIBS="-lfreetype -lz -lbz2"
+[ -z "$FT2_CFLAGS" ] && FT2_CFLAGS="-I/usr/include/freetype2"
+if ! echo "$LDFLAGS $FT2_LIBS" | grep -qe '\-lz' ; then
+    if ${cross_prefix}pkg-config --exists zlib ; then
+        FT2_LIBS="$FT2_LIBS $(${cross_prefix}pkg-config --libs zlib)"
+        FT2_CFLAGS="$FT2_CFLAGS $(${cross_prefix}pkg-config --cflags zlib)"
+    else
+        FT2_LIBS="$FT2_LIBS -lz"
     fi
-    if ! echo $LDFLAGS | grep -qe '\-lz' ; then
-        if ${cross_prefix}pkg-config --exists zlib ; then
-            LDFLAGS="$(${cross_prefix}pkg-config --libs zlib) $LDFLAGS"
-            CFLAGS="$(${cross_prefix}pkg-config --cflags zlib) $CFLAGS"
-        else
-            LDFLAGS="-lz $LDFLAGS"
-        fi
-    fi
+fi
+if ! echo "$LDFLAGS $FT2_LIBS" | grep -qe '\-lbz2' ; then
+    FT2_LIBS="$FT2_LIBS -lbz2"
+fi
+cat > conftest.h <<EOF
+#include <ft2build.h>
+#include FT_FREETYPE_H
+EOF
+if cc_check conftest.h "$FT2_CFLAGS $FT2_LIBS" "FT_Init_FreeType(0);" ; then
+    LDFLAGS="$LDFLAGS $FT2_LIBS"
+    CFLAGS="$CFLAGS $FT2_CFLAGS"
 else
     die "Failed to locate FreeType"
 fi
