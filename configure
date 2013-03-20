@@ -105,16 +105,16 @@ case $host_cpu in
         ;;
 esac
 
-cc_check || die "No working compiler"
-
-cc_check pthread.h -lpthread && LDFLAGS="$LDFLAGS -lpthread" || die "Failed to locate pthreads"
-
 if [ "$raspberrypi" = "auto" ] ; then
     raspberrypi="no"
     if [ "$ARCH" = "ARM" ] && grep -qe 'BCM2708' /proc/cpuinfo ; then
         raspberrypi="yes"
     fi
 fi
+
+cc_check || die "No working compiler"
+
+cc_check pthread.h -lpthread && LDFLAGS="$LDFLAGS -lpthread" || die "Failed to locate pthreads"
 
 if [ "$raspberrypi" = "yes" ] ; then
     PI_CFLAGS="$PI_CFLAGS -I$VC_SDK_PATH/include"
@@ -129,8 +129,21 @@ if [ "$raspberrypi" = "yes" ] ; then
 
     define ARCH_RPI
     define USE_VCHIQ_ARM
-    LDFLAGS="$PI_LIBS $LDFLAGS"
+    LDFLAGS="$LDFLAGS $PI_LIBS"
     CFLAGS="$PI_CFLAGS $CFLAGS"
+fi
+
+cc_check EGL/egl.h "-lEGL -lGLESv2" "eglCreateContext(0,0,0,0);" && LDFLAGS="$LDFLAGS -lEGL -lGLESv2" || die "Failed to locate EGL and GLESv2"
+
+if ! cc_check VG/openvg.h "" "vgDestroyPath(0);" ; then
+    cc_check VG/openvg.h "-lOpenVG" "vgDestroyPath(0);" && LDFLAGS="$LDFLAGS -lOpenVG" || die "Failed to locate OpenVG"
+fi
+
+if cc_check IL/OMX_Core.h "-DOMX_SKIP64BIT -lopenmaxil" "OMX_Init();" ; then
+    define OMX_SKIP64BIT
+    LDFLAGS="$LDFLAGS -lopenmaxil"
+else
+    die "Failed to locate OpenMAX"
 fi
 
 if ${cross_prefix}pkg-config --exists freetype2 2>/dev/null ; then
@@ -161,15 +174,6 @@ else
     die "Failed to locate FreeType"
 fi
 
-cc_check EGL/egl.h "-lEGL -lGLESv2" "eglCreateContext(0,0,0,0);" && LDFLAGS="-lEGL -lGLESv2 $LDFLAGS" || die "Failed to locate GLES"
-
-if cc_check IL/OMX_Core.h "-DOMX_SKIP64BIT -lopenmaxil" "OMX_Init();" ; then
-    LDFLAGS="-lopenmaxil $LDFLAGS"
-    define OMX_SKIP64BIT
-else
-    die "Failed to locate OpenMAX"
-fi
-
 if [ "$libcec" = "auto" ] ; then
     libcec="no"
     if ${cross_prefix}pkg-config --exists libcec &>/dev/null ; then
@@ -180,7 +184,7 @@ if [ "$libcec" = "auto" ] ; then
 
     if cc_check libcec/cecc.h "$CEC_CFLAGS $CEC_LIBS" "cec_initialise(0);" ; then
         libcec="yes"
-        LDFLAGS="$CEC_LIBS $LDFLAGS"
+        LDFLAGS="$LDFLAGS $CEC_LIBS"
         CFLAGS="$CEC_CFLAGS $CFLAGS"
         define HAVE_LIBCEC
     fi
@@ -196,7 +200,7 @@ if [ "$avahi" = "auto" ] ; then
 
     if cc_check avahi-client/client.h "$AVAHI_CFLAGS $AVAHI_LIBS" "avahi_client_new(0,0,0,0,0);" ; then
         avahi="yes"
-        LDFLAGS="$AVAHI_LIBS $LDFLAGS"
+        LDFLAGS="$LDFLAGS $AVAHI_LIBS"
         CFLAGS="$AVAHI_CFLAGS $CFLAGS"
         define HAVE_AVAHI
     fi
@@ -208,19 +212,19 @@ if ${cross_prefix}pkg-config --exists libmpg123 &>/dev/null ; then
 fi
 [ -z "$MPG123_LIBS" ] && MPG123_LIBS="-lmpg123"
 if cc_check mpg123.h "$MPG123_CFLAGS $MPG123_LIBS" "mpg123_init();" ; then
-    LDFLAGS="$MPG123_LIBS $LDFLAGS"
+    LDFLAGS="$LDFLAGS $MPG123_LIBS"
     CFLAGS="$MPG123_CFLAGS $CFLAGS"
 else
     die "Failed to locate mpg123"
 fi
 
-cc_check neaacdec.h "-lfaad" "NeAACDecOpen();" && LDFLAGS="-lfaad $LDFLAGS" || die "Failed to locate FAAD2"
+cc_check neaacdec.h "-lfaad" "NeAACDecOpen();" && LDFLAGS="$LDFLAGS -lfaad" || die "Failed to locate FAAD2"
 
 cat > conftest.h <<EOF
 #include <stdint.h>
 #include <a52dec/a52.h>
 EOF
-cc_check conftest.h "-la52" "a52_init(0);" && LDFLAGS="-la52 $LDFLAGS" || die "Failed to locate a52dec"
+cc_check conftest.h "-la52" "a52_init(0);" && LDFLAGS="$LDFLAGS -la52" || die "Failed to locate a52dec"
 
 rm -f conftest*
 
